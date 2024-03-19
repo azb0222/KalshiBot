@@ -38,7 +38,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- implement Juypter Notebook for visualization 
+- implement Juypter Notebook for visualization, expose Notebook 
 - import into EC2
 - cron job to run script during trading hours only 
 
