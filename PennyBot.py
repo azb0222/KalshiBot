@@ -50,7 +50,7 @@ def main():
 
 
 def is_market_open(api_client):
-    return api_client.exchangeStatus() #TODO: adjust to check for stock market opening times
+    return api_client.get_exchange_status() #TODO: adjust to check for stock market opening times
 
 def get_market_tickers(api_client, series_ticker): 
     market_tickers = [] #TODO: filter out by including the current date
@@ -83,7 +83,7 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
         await websocket.send(json_ticker_request)
         while True:
             response = await websocket.recv()
-            print(f"< {response}")
+            #print(f"< {response}")
             response_data = json.loads(response)
 
             if response_data['type'] == "ticker":
@@ -97,6 +97,7 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
         
                 else:
                     if market_ticker not in jumps:
+                        print(f"< ORDER SOLD")
                         jumps[market_ticker] = []
                     jumps[market_ticker].append((yes_bid, ts))
 
@@ -109,6 +110,7 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
                         time_diff = last[1] - secondToLast[1]
 
                         if bid_diff >= 2 and time_diff <= 2: 
+                            print(f"< ORDER BOUGHT")
                             buy_order_response = create_order(api_client, market_ticker, True, True, yes_bid)
                             purchases[market_ticker] = (buy_order_response.order.yes_price)
                             create_order(api_client, market_ticker, False, False, yes_bid+2)
@@ -126,3 +128,7 @@ def create_order(api_client, market_ticker, is_buy, is_quick, price):
                         side='yes',
     ))
     return order_response
+
+
+if __name__ == "__main__":
+    main()
