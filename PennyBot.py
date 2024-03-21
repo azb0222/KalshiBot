@@ -42,6 +42,8 @@ def main():
         return #TODO: adjust to wait until market is open
 
     account_balance = kalshi_api_client.get_balance()
+    print("CURRENT ACCOUNT BALANCE:")
+    print(account_balance)
     trading_balance = account_balance.balance * 0.10  #TODO: implement this check
 
     market_tickers = get_market_tickers(kalshi_api_client, series_tickers["S&P_RANGE"])
@@ -57,6 +59,7 @@ def get_market_tickers(api_client, series_ticker):
     markets_response = api_client.get_markets(series_ticker=series_ticker)
     for market in markets_response.markets: 
         market_tickers.append(market.ticker)
+    print(market_tickers)
     return market_tickers
 
 
@@ -83,38 +86,48 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
         await websocket.send(json_ticker_request)
         while True:
             response = await websocket.recv()
-            #print(f"< {response}")
+            print(f"< {response}")
             response_data = json.loads(response)
 
             if response_data['type'] == "ticker":
+                print(f"< {response}")
                 market_ticker = response_data['msg']['market_ticker']
                 yes_bid = response_data['msg']['yes_bid']
                 ts = response_data['msg']['ts']
 
                 if market_ticker in purchases:
                     if yes_bid <= purchases[market_ticker]:
-                        create_order(api_client, market_ticker, False, True, purchases[market_ticker]) #TODO: implement error handling
+                        sellOrderResponse = reate_order(api_client, market_ticker, False, True, purchases[market_ticker]) #TODO: implement error handling
+                        print("SOLD BAD")
+                        print(f"< {sellOrderResponse}")
         
                 else:
                     if market_ticker not in jumps:
-                        print(f"< ORDER SOLD")
-                        jumps[market_ticker] = []
-                    jumps[market_ticker].append((yes_bid, ts))
+                        jumps[market_ticker] = [[],[]] #TODO: make this into a tuple 
+                    jumps[market_ticker][0].append(yes_bid) #price []
+                    jumps[market_ticker][1].append(ts) # seconds [] 
 
-                    analyzeList = jumps[market_ticker]
-                    if len(analyzeList) >= 2:
-                        last = analyzeList[-1]
-                        secondToLast = analyzeList[-2]
-
-                        bid_diff = last[0] - secondToLast[0]
-                        time_diff = last[1] - secondToLast[1]
-
-                        if bid_diff >= 2 and time_diff <= 2: 
-                            print(f"< ORDER BOUGHT")
+                    rates = calculate_rate_of_change(jumps[market_ticker][0], jumps[market_ticker][1])
+                    if rates:
+                        last_rate_of_change = rates[-1][2]
+                        if last_rate_of_change > 0.80:
                             buy_order_response = create_order(api_client, market_ticker, True, True, yes_bid)
                             purchases[market_ticker] = (buy_order_response.order.yes_price)
                             create_order(api_client, market_ticker, False, False, yes_bid+2)
+                            print("BOUGHT")
+                            print(f"< {buy_order_response}")
 
+#TODO: fix this to not calculate all the back ones 
+def calculate_rate_of_change(prices, times):
+    rate_of_change_results = []
+
+    for i in range(len(times)):
+        for j in range(i + 1, len(times)):
+            if times[j] - times[i] >= 4:
+                rate_of_change = (prices[j] - prices[i]) / (times[j] - times[i])
+                rate_of_change_results.append((times[i], times[j], rate_of_change))
+                break  
+    return rate_of_change_results
 
 def create_order(api_client, market_ticker, is_buy, is_quick, price): 
     order_UUID = str(uuid.uuid4())
@@ -127,8 +140,13 @@ def create_order(api_client, market_ticker, is_buy, is_quick, price):
                         client_order_id=order_UUID,
                         side='yes',
     ))
+    print(f"ORDER MADE:")
+    print(order_response)
     return order_response
+
+
 
 
 if __name__ == "__main__":
     main()
+
