@@ -97,7 +97,7 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
 
                 if market_ticker in purchases:
                     if yes_bid <= purchases[market_ticker]:
-                        sellOrderResponse = reate_order(api_client, market_ticker, False, True, purchases[market_ticker]) #TODO: implement error handling
+                        sellOrderResponse = create_order(api_client, market_ticker, False, True, purchases[market_ticker]) #TODO: implement error handling
                         print("SOLD BAD")
                         print(f"< {sellOrderResponse}")
         
@@ -107,27 +107,23 @@ async def websocket_connect_with_auth(api_client, token, market_tickers):
                     jumps[market_ticker][0].append(yes_bid) #price []
                     jumps[market_ticker][1].append(ts) # seconds [] 
 
-                    rates = calculate_rate_of_change(jumps[market_ticker][0], jumps[market_ticker][1])
-                    if rates:
-                        last_rate_of_change = rates[-1][2]
-                        if last_rate_of_change > 0.80:
+                    rate = calculate_rate_of_change(jumps[market_ticker][0], jumps[market_ticker][1])
+                    if rate:
+                        if rate > 0.80:
                             buy_order_response = create_order(api_client, market_ticker, True, True, yes_bid)
                             purchases[market_ticker] = (buy_order_response.order.yes_price)
                             create_order(api_client, market_ticker, False, False, yes_bid+2)
                             print("BOUGHT")
                             print(f"< {buy_order_response}")
 
-#TODO: fix this to not calculate all the back ones 
+#TODO: fix this to logic to not be spagetti
 def calculate_rate_of_change(prices, times):
-    rate_of_change_results = []
-
-    for i in range(len(times)):
-        for j in range(i + 1, len(times)):
-            if times[j] - times[i] >= 4:
-                rate_of_change = (prices[j] - prices[i]) / (times[j] - times[i])
-                rate_of_change_results.append((times[i], times[j], rate_of_change))
-                break  
-    return rate_of_change_results
+    if len(times) < 4 or len(prices) < 4:
+        return None  
+    prices = prices[-4:]
+    times = times[-4:]
+    rate_of_change = (prices[-1] - prices[0]) / (times[-1] - times[0])
+    return rate_of_change
 
 def create_order(api_client, market_ticker, is_buy, is_quick, price): 
     order_UUID = str(uuid.uuid4())
